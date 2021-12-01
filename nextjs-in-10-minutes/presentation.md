@@ -175,3 +175,13 @@ setGreeting(result);
 - Can be combined with dynamic paths by exporting a function named `getStaticPaths`.
 - This function will be run when the site is built and can be used to do things like fetch data.
 - Pages can also leverage Incremental Static Regeneration (ISR) to occasionally rebuild themselves.
+
+---
+
+# Questions / Additional Resources
+
+## Questions?
+
+## Resources
+
+- https://nextjs.org/docs/getting-started
