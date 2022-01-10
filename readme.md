@@ -1,7 +1,5 @@
 # Presentations
 
-This repo houses presentations I have given for my job and elsewhere.
-
 ## [nextjs-in-10-minutes](./nextjs-in-10-minutes)
 
 ### Format
