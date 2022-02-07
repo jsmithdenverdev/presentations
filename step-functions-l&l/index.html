@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+
+    <title>Step Functions</title>
+
+    <meta
+      name="description"
+      content="A framework for easily creating beautiful presentations using HTML"
+    />
+    <meta name="author" content="Hakim El Hattab" />
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link rel="stylesheet" href="dist/reset.css" />
+    <link rel="stylesheet" href="dist/reveal.css" />
+    <link rel="stylesheet" href="dist/theme/black.css" id="theme" />
+
+    <!-- Theme used for syntax highlighting of code -->
+    <link
+      rel="stylesheet"
+      href="plugin/highlight/monokai.css"
+      id="highlight-theme"
+    />
+    <style>
+      p {
+        text-align: left;
+      }
+
+      ul {
+        font-size: smaller;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section id="1">
+          <img src="./static/img/step-functions-logo.png" />
+          <h3>AWS Step Functions</h3>
+          <p style="text-align: center">
+            <small> Serverless orchestration </small>
+          </p>
+        </section>
+        <section id="2">
+          <section id="2.1">
+            <h3>What are step functions?</h3>
+          </section>
+          <section id="2.2">
+            <p>From the docs</p>
+            <p>
+              <q>
+                AWS Step Functions are a function orchestrator that makes it
+                easy to sequence AWS Lambda functions and multiple AWS services.
+              </q>
+            </p>
+          </section>
+          <section id="2.3">
+            <h3>What does that mean?</h3>
+          </section>
+          <section id="2.4" style="font-size: smaller">
+            <ul>
+              <li>
+                Provide a way to build <b>pipelines</b> and
+                <b>workflows</b> that target lambda functions and other AWS
+                services.
+              </li>
+              <li>
+                Composed of small steps called States that allow us to break
+                complex problems into simpler ones.
+              </li>
+              <li>
+                Contain powerful branching logic that allows us to compose
+                behavior ranging from error handling to supporting multiple
+                execution paths.
+              </li>
+            </ul>
+          </section>
+        </section>
+        <section id="3">
+          <h3>Terminology</h3>
+        </section>
+        <section id="4">
+          <ul>
+            <li>Workflow / Pipeline - State Machine</li>
+            <li>Step - State</li>
+          </ul>
+        </section>
+        <section id="5">
+          <section id="5.1">
+            <h3>State Machines</h3>
+          </section>
+          <section id="5.2">
+            <p>
+              A State Machine is the representation of a workflow or pipeline.
+            </p>
+          </section>
+          <section id="5.3">
+            <p>State Machines...</p>
+            <ul>
+              <li>Contain details about the execution plan</li>
+              <li>Defined using Amazon States Language (JSON)</li>
+              <li>Contain all the States for the State Machine</li>
+              <li>Declare the State to begin execution with</li>
+              <li>Provide additional metadata such as execution timeouts</li>
+            </ul>
+          </section>
+          <section id="5.4">
+            <p>Example State Machine</p>
+            <pre><code class="hljs" data-trim data-line-numbers="|3|6-12|2,4,5">
+                {
+                  "Comment": "An example that adds two numbers together.",
+                  "StartAt": "Add",
+                  "Version": "1.0",
+                  "TimeoutSeconds": 10,
+                  "States": {
+                    "Add": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:lambda:x:x:function:Add",
+                      "End": true
+                    }
+                  }
+                }                  
+              </code></pre>
+          </section>
+        </section>
+        <section id="6">
+          <section id="6.1">
+            <h3>States</h3>
+          </section>
+          <section id="6.2">
+            <p>A State Machine is made up of steps (States).</p>
+          </section>
+          <section id="6.3">
+            <p>States...</p>
+            <ul>
+              <li>Define what action to take at their point of execution</li>
+              <li>
+                Tell the state machine what to execute next (or stop execution)
+              </li>
+              <li>Receive the output from the previous state as their input</li>
+              <li>
+                May process their input or output through use of selectors
+              </li>
+            </ul>
+          </section>
+          <section id="6.4">
+            <p>Example State</p>
+            <pre><code class="hljs" data-trim data-line-numbers="|2|3,4|5">
+                {
+                  "Add": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:lambda:x:x:function:Add",
+                    "End": true
+                  }
+                }
+            </code></pre>
+          </section>
+        </section>
+        <section id="7">
+          <section id="7.1">
+            <h3>State Types</h3>
+          </section>
+          <section id="7.2">
+            <p>The State's type defines its behavior</p>
+            <ul style="float: left">
+              <li class="fragment">
+                Task - Executes a piece of work (such as calling a Lambda or
+                publishing a message to SNS)
+              </li>
+              <li class="fragment">
+                Choice - Adds conditinal branching logic <span></span>
+              </li>
+              <li class="fragment">
+                Wait - Pauses execution of the state machine
+              </li>
+              <li class="fragment">
+                Parallel - Execute a known number of steps in parallel
+              </li>
+              <li class="fragment">
+                Map - Execute a step a dynamic number of times
+              </li>
+              <li class="fragment">
+                Succeed - Stop the state machine marking it as succeeded
+              </li>
+              <li class="fragment">
+                Fail - Stop the state machine marking it as failed
+              </li>
+              <li class="fragment">
+                Pass - Pass the supplied input as output (useful for injecting
+                data)
+              </li>
+            </ul>
+          </section>
+        </section>
+        <section id="8">
+          <section id="8.1">
+            <h3>Error handling</h3>
+          </section>
+          <section id="8.2">
+            <p>
+              Task and Parallel States have the ability to define complex retry
+              logic or fallback States.
+            </p>
+          </section>
+          <section id="8.3">
+            <h3>Retry logic</h3>
+          </section>
+          <section id="8.4">
+            <p>
+              A State may have an array of retriers that specify retry
+              conditions and behavior.
+            </p>
+            <pre><code class="hljs" data-trim data-line-numbers="|6-11|7|8|9|10">
+                {
+                  "Add": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:lambda:x:x:function:Add",
+                    "End": true,
+                    "Retry": [ {
+                      "ErrorEquals": [ "States.Timeout" ],
+                      "MaxAttempts": 2,
+                      "IntervalSeconds": 3,
+                      "BackoffRate": 1.5
+                    } ]
+                  }
+                }
+              </code></pre>
+          </section>
+          <section id="8.6">
+            <h3>Fallback States</h3>
+          </section>
+          <section id="8.7">
+            <p>
+              A State may have an array of catchers that specify catch
+              conditions and behavior.
+            </p>
+            <pre><code class="hljs" data-trim data-line-numbers="|6-9|7|8">
+                {
+                  "Add": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:lambda:x:x:function:Add",
+                    "End": true,
+                    "Catch": [ {
+                      "ErrorEquals": [ "States.TaskFailed" ],
+                      "Next": "HandleFailure"
+                    } ]
+                  }
+                }
+              </code></pre>
+          </section>
+        </section>
+        <section id="9">
+          <section id="9.1">
+            <h3>Real world example</h3>
+          </section>
+          <section id="9.2">
+            <p>Cart Validations Service</p>
+          </section>
+          <section id="9.3">
+            <p>V1 Requirements</p>
+            <ul style="float: left">
+              <li>Take a cart as input</li>
+              <li>
+                Check restrictions for the cart using the existing restrictions
+                services
+                <ul>
+                  <li>Spending Limits</li>
+                  <li>Product Quantity Limits</li>
+                </ul>
+              </li>
+              <li>Run restrictions checks in parallel</li>
+              <li>
+                On completion aggregate results and publish to CartEvents topic
+              </li>
+              <li>On failure publish the error to CartEvents topic</li>
+              <li>
+                Build the service in a way that allows the Order service to call
+                it
+              </li>
+            </ul>
+          </section>
+          <section id="9.4" data-transition="none">
+            <div class="r-stack">
+              <img
+                class=""
+                src="static/img/stepfunctions_graph_overview.svg"
+                style="background: white"
+              />
+              <img
+                class="fragment"
+                src="static/img/stepfunctions_graph_buildrequest.svg"
+                style="background: white"
+              />
+              <img
+                class="fragment"
+                src="static/img/stepfunctions_graph_validate.svg"
+                style="background: white"
+              />
+              <img
+                class="fragment"
+                src="static/img/stepfunctions_graph_aggregate.svg"
+                style="background: white"
+              />
+              <img
+                class="fragment"
+                src="static/img/stepfunctions_graph_publishresults.svg"
+                style="background: white"
+              />
+              <img
+                class="fragment"
+                src="static/img/stepfunctions_graph_validatefailed.svg"
+                style="background: white"
+              />
+            </div>
+          </section>
+        </section>
+        <section id="10">
+          <section id="10.1">
+            <h3>Usage in serverless</h3>
+          </section>
+          <section id="10.2">
+            <p>
+              We are using a plugin for the serverless framework that allows us
+              to define State Machines in a serverless yml file.
+            </p>
+          </section>
+          <section id="10.3">
+            <p>Example serverless yml file</p>
+            <pre><code class="hljs" data-trim data-line-numbers="|3|4-7|8-14|">
+                stepFunctions:
+                  stateMachines:
+                    Example:
+                      events:
+                        - http:
+                          path: /v1/example
+                          method: POST
+                      definition:
+                        StartAt: Add
+                        States:
+                          Add:
+                            Type: Task
+                            Resource: arn:aws:lambda:x:x:function:Add
+                            End: true       
+            </code></pre>
+          </section>
+        </section>
+      </div>
+    </div>
+
+    <script src="dist/reveal.js"></script>
+    <script src="plugin/zoom/zoom.js"></script>
+    <script src="plugin/notes/notes.js"></script>
+    <script src="plugin/search/search.js"></script>
+    <script src="plugin/markdown/markdown.js"></script>
+    <script src="plugin/highlight/highlight.js"></script>
+    <script>
+      // Also available as an ES module, see:
+      // https://revealjs.com/initialization/
+      Reveal.initialize({
+        controls: true,
+        progress: true,
+        center: true,
+        hash: true,
+
+        // Learn about plugins: https://revealjs.com/plugins/
+        plugins: [
+          RevealZoom,
+          RevealNotes,
+          RevealSearch,
+          RevealMarkdown,
+          RevealHighlight,
+        ],
+      });
+    </script>
+  </body>
+</html>
