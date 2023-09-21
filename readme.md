@@ -54,6 +54,10 @@ A deep dive into new React Router 6 features and how my dev teams are expected t
 
 [marp](https://marp.app/)
 
+### PDF Version
+
+[presentation.pdf](https://github.com/jsmithdenverdev/presentations/tree/main/react-router-6-features/presentation.pdf)
+
 ### Running
 
 - clone
