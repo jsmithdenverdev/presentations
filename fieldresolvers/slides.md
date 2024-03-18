@@ -158,7 +158,7 @@ There are many libraries for creating a GraphQL server.
 
 # Refresher
 
-Query
+Query structure
 
 ```graphql {|1|2,6,12,16|3-5,13-15}
 query readAnimal {
@@ -212,6 +212,8 @@ query readAnimal {
 
 # Thinking in graphs
 
+##
+
 Our types can also express relationships (this is where the _Graph_ of GraphQL comes in)
 
 ```graphql {|,12-15|9}
@@ -235,6 +237,8 @@ type Human {
 ---
 
 # Thinking in graphs
+
+##
 
 We can also query these relationships
 
@@ -264,8 +268,12 @@ query georgeOwners {
 
 # What is GraphQL trying to solve?
 
-- Allows us to model our types and their relationships as a graph
+This is not an exhaustive list 😉
+
+- Helps us model our types and their relationships as a graph
 - Helps us fetch just the data we need
+  - Overfetching
+  - Underfetching
 - Allows us to fetch this data from a single resource
 
 ---
@@ -299,8 +307,9 @@ It's fields all the way down...
 - Those queries can return scalar values (strings, numbers, etc) or complex values like objects
 - The objects we return have their own sets of fields, these can also be scalar values or complex types
 
-And something new...
+## Some new info...
 
+- GraphQL implementations will generally coerce scalar and object values as long as keys match
 - Fields can be backed by a resolver
 - This changes the behavior of the query
 - That resolver is only executed if that field is requested
@@ -352,7 +361,7 @@ We query the database and use a sql join to retrieve the related owner data.
 ```typescript
 const resolvers = {
   Query: {
-    async animal({ params, db }): Promise<Animal> {
+    async animal({ parent, args, { db } }): Promise<Animal> {
       const animal = await db.queryRow(
         `SELECT a.id, a.name, a.age, o.id, o.name FROM animals a
          INNER JOIN owners o ON o.animal_id = a.id
@@ -586,9 +595,9 @@ function batchLoadContacts(keys: string[]): Promise<Contact[]> {
     `SELECT id, email, phone FROM contact WHERE human_id IN ($1)`,
     keys
   );
-  // contacts = [{"email": "test1@fake.com"}, {"email": "test2@fake.com"}]
+  // contacts = [{"email": "user1@fake.com"}, {"email": "user3@fake.com"}]
   return contacts;
-  // contacts must be = [{"email": "test1@fake.com"}, null, {"email": "test2@fake.com"}]
+  // contacts must be = [{"email": "user1@fake.com"}, null, {"email": "user3@fake.com"}]
 }
 ```
 
@@ -596,7 +605,7 @@ function batchLoadContacts(keys: string[]): Promise<Contact[]> {
 
 # Recap
 
-We're covering a lot
+We've covered a lot
 
 - Our queries can return scalar values (strings, numbers, etc) or complex values like objects
 - The objects we return have their own fields, these can also be scalar values or complex types
