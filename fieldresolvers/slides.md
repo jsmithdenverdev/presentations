@@ -1,7 +1,7 @@
 ---
 # try also 'default' to start simple
-theme: default
-# theme: seriph
+# theme: default
+theme: seriph
 # random image from a curated Unsplash collection by Anthony
 # like them? see https://unsplash.com/collections/94734566/slidev
 background: https://cover.sli.dev
@@ -379,8 +379,7 @@ const resolvers = {
 ## Cons
 
 - May end up with additional relationships to fetch, leading to a larger and larger resolver
-  - E.g., `Human` may have a `Contact` field, with data living in SalesForce (🤮)
-  - Now we need to implement a SalesForce client just to continue fetching `Animal` data
+  - E.g., `Human` may have a `Contact` field, with data in another table
 - Query performance may suffer from loading more relations
 - Still over fetching
   - Even if we aren't interested in `owners` data, the `animal` resolver is still fetching it
@@ -428,17 +427,21 @@ const resolvers = {
 ## Cons
 
 - Slightly more complex, requires a secondary resolver function
-- Brings us to the GraphQL n+1 query problem
+- Brings us to the GraphQL N+1 query problem
 
 ---
 
 # The N+1 query problem
 
-A bad day to be a field
+A bad day to be a field.
 
-The N+1 query problem arises when we leverage resolvers.
+The N+1 query problem generally refers to a query that results in multiple sequential DB operations.
 
-Resolvers are executed independently and don't know if similar data has been loaded or can be batched.
+- Fetching a list of data, and including a field resolver
+- Fetching nested fields, which may require their own resolvers to be run
+- Fetching recursive data structures, which may require the same queries to be run
+
+Resolvers are executed independently and sequentially, they don't have a native batching mechanism.
 
 ---
 
@@ -475,33 +478,30 @@ type Contact {
 
 # An example of N+1
 
-Things appear ok on the surface
+Some issues become apparent.
 
-But we can see issues. If we have a pet with 50 owners (weird) and we need the contact info, we're going to run the `contact` field resolver 50 times.
+If we have a pet with 50 owners (weird) and we need the contact info, we're going to execute 1 query to fetch owners, and then 50 queries to fetch each owners contact. Resulting in 51 operations.
 
 ```typescript {|}{maxHeight: '70%'}
 const resolvers = {
   Query: {
     async animal({ parent, args, { db }}): Promise<Animal> {
-      const animal = await db.queryRow(
-        `SELECT id, name, age FROM animals WHERE id = $1`,
-        args["id"]
-      );
-      return animal;
+      // ... fetch the animal
     },
   },
   Animal: {
     async owners({ parent, args, { db }}): Promise<Owner[]> {
-      const owners = await db.query(
-        `SELECT id, name FROM owners WHERE animal_id = $1`,
-        parent["id"]
-      );
-      return owners;
+      // ... fetch the owners
     },
   },
   Human: {
-    async contact({ parent, args, { salesforce }}): Promise<Contact> {
-      const contact = await salesforce.fetchContact(parent["id"]);
+    // This will be executed 50 times
+    async contact({ parent, args, { db }}): Promise<Contact> {
+      // We're hitting the DB 50 times
+      const contact = await db.queryRow(
+        `SELECT id, email, phone FROM contact WHERE human_id = $1`,
+        parent["id"]
+      );
       return contact;
     }
   }
@@ -510,12 +510,123 @@ const resolvers = {
 
 ---
 
-# Enter data loader
+# Enter dataloader
 
 The batch and cache master
 
-Instead of our resolvers directly calling the database, they call a data loader batching function which returns a promise.
+- Dataloader is a utility that provides batching and request scoped caching
+- It helps us batch expensive operations like DB requests, and can minimize the effect of the N+1 problem
+- A dataloader is initialized with a batching function
+- Our resolvers call a `load` method on the dataloader and await the results
 
-Resolvers are typically called in serial, and when a promise is returned the runtime moves onto the next resolver.
+---
 
-This behavior allows the batching function to aggregate calls from each resolver, and submit a single query.
+# How dataloader is initialized
+
+- We initialize a data loader with a batch function
+- This batch function accepts an array of keys and returns a promise with an array of results
+- Our code doesn't interact with the batch function directly, instead it calls a `load` method on the dataloader
+
+```typescript
+async function batchLoadContacts(keys: string[]): Promise<Contact[]> {
+  // Now, we're hitting the DB once
+  const contacts = await db.query(
+    `SELECT id, email, phone FROM contact WHERE human_id IN ($1)`,
+    keys
+  );
+  return contacts;
+}
+
+// We initialize the dataloader with our batching function
+const contactLoader = new DataLoader(batchLoadContacts);
+```
+
+---
+
+# How dataloader is used
+
+##
+
+Now our resolver simply calls the `load` method.
+
+The `contact` resolver is still called 50 times (one for each owner). But the expensive DB operation has been collapsed into a single call.
+
+```typescript
+const resolvers = {
+  // ... other resolvers
+  Human: {
+    // This is still executed 50 times
+    async contact({ parent, args, { db }}): Promise<Contact> {
+      // But now we're calling the dataloader which handles the DB call for us, resulting in 1 DB call
+      const contact = await contactLoader.load(parent["id"]);
+      return contact;
+    }
+  }
+};
+```
+
+---
+
+# Dataloader constraints
+
+##
+
+To use dataloader effectively, the following batch function constraints must be met
+
+- The array of values returned from the batch function must be the same length as the array of keys
+- The array of values must be in the same order as the array of keys
+
+Example
+
+```typescript
+// keys = ["1", "2", "3"]
+function batchLoadContacts(keys: string[]): Promise<Contact[]> {
+  // the DB has no value for key "2"
+  const contacts = await db.query(
+    `SELECT id, email, phone FROM contact WHERE human_id IN ($1)`,
+    keys
+  );
+  // contacts = [{"email": "test1@fake.com"}, {"email": "test2@fake.com"}]
+  return contacts;
+  // contacts must be = [{"email": "test1@fake.com"}, null, {"email": "test2@fake.com"}]
+}
+```
+
+---
+
+# Recap
+
+We're covering a lot
+
+- Our queries can return scalar values (strings, numbers, etc) or complex values like objects
+- The objects we return have their own fields, these can also be scalar values or complex types
+- We have options for handling how this data is returned
+- We can write big resolvers that try to return as much as possible, or break fields into their own resolvers
+- More resolvers can mean the N+1 query problem
+- N+1 query problem can introduce serious performance issues
+- Dataloader can help with these issues
+
+---
+
+# Field resolvers, a GraphQL panacea?
+
+Oh boy, this question again
+
+## Absolutely not
+
+Just like with everything else in engineering, we have multiple options to weigh.
+
+- Is it more likely for the field to be included or excluded in the query?
+  - If its more likely to be excluded it may be a good field resolver candidate
+- Are you modeling highly relational data?
+  - Probably a good candidate for a field resolver, especially if you're needing more and more joins to get all the data
+- Does the data for your field have an expensive operation to fetch it?
+  - Probably a good candidate for a field resolver
+- Are you modeling recursive data?
+  - Definitely a good time to use a field resolver
+
+---
+
+# Questions?
+
+Thank you for your time and flexibility!
