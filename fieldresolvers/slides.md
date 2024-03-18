@@ -1,6 +1,7 @@
 ---
 # try also 'default' to start simple
-theme: seriph
+theme: default
+# theme: seriph
 # random image from a curated Unsplash collection by Anthony
 # like them? see https://unsplash.com/collections/94734566/slidev
 background: https://cover.sli.dev
@@ -213,7 +214,7 @@ query readAnimal {
 
 Our types can also express relationships (this is where the _Graph_ of GraphQL comes in)
 
-```graphql {|,9,12-15}
+```graphql {|,12-15|9}
 type Query {
   animal(id: ID!): Animal
 }
@@ -237,7 +238,7 @@ type Human {
 
 We can also query these relationships
 
-```graphql {|,3-5,12-15}
+```graphql {|,3-5,12-16}
 query georgeOwners {
   animal(id: "2ba43365-973a-41eb-87ff-b6033f332885") {
     owners {
@@ -334,9 +335,15 @@ type Human {
 
 ---
 
+# Let's look at some resolvers
+
+_Disclaimer: we're about to enter psuedo code land, where things work simply because I want them to_
+
+---
+
 # Example 1
 
-We'll write some psuedo code to give the general idea
+##
 
 First, the simplest version of our query. It resolves the entire `Animal` in one call.
 
@@ -347,7 +354,7 @@ const resolvers = {
   Query: {
     async animal({ params, db }): Promise<Animal> {
       const animal = await db.queryRow(
-        `SELECT * FROM animals a
+        `SELECT a.id, a.name, a.age, o.id, o.name FROM animals a
          INNER JOIN owners o ON o.animal_id = a.id
          WHERE a.id = $1`,
         params["id"]
@@ -389,18 +396,18 @@ Now, we'll create a resolver for the `owners` field on the `Animal` type.
 ```typescript
 const resolvers = {
   Query: {
-    async animal({ params, db }): Promise<Animal> {
+    async animal({ parent, args, { db } }): Promise<Animal> {
       const animal = await db.queryRow(
-        `SELECT * FROM animals WHERE id = $1`,
-        params["id"]
+        `SELECT id, name, age FROM animals WHERE id = $1`,
+        args["id"]
       );
       return animal;
     },
   },
   Animal: {
-    async owners({ parent, db }): Promise<Owner[]> {
+    async owners({ parent, args, { db } }): Promise<Owner[]> {
       const owners = await db.query(
-        `SELECT * FROM owners WHERE animal_id = $1`,
+        `SELECT id, name FROM owners WHERE animal_id = $1`,
         parent["id"]
       );
       return owners;
@@ -421,4 +428,94 @@ const resolvers = {
 ## Cons
 
 - Slightly more complex, requires a secondary resolver function
-- Brings us to the GraphQL n + 1 query problem
+- Brings us to the GraphQL n+1 query problem
+
+---
+
+# The N+1 query problem
+
+A bad day to be a field
+
+The N+1 query problem arises when we leverage resolvers.
+
+Resolvers are executed independently and don't know if similar data has been loaded or can be batched.
+
+---
+
+# An example of N+1
+
+New requirements for our pet friends API
+
+Let's imagine we have a new requirement to include `Contact` data in our API.
+
+```graphql
+type Query {
+  animal(id: ID!): Animal
+}
+
+type Animal {
+  id: ID!
+  name: String!
+  age: Int!
+  owners: [Human!]
+}
+
+type Human {
+  id: ID!
+  name: String!
+  contact: Contact!
+}
+
+type Contact {
+  phone: String!
+}
+```
+
+---
+
+# An example of N+1
+
+Things appear ok on the surface
+
+But we can see issues. If we have a pet with 50 owners (weird) and we need the contact info, we're going to run the `contact` field resolver 50 times.
+
+```typescript {|}{maxHeight: '70%'}
+const resolvers = {
+  Query: {
+    async animal({ parent, args, { db }}): Promise<Animal> {
+      const animal = await db.queryRow(
+        `SELECT id, name, age FROM animals WHERE id = $1`,
+        args["id"]
+      );
+      return animal;
+    },
+  },
+  Animal: {
+    async owners({ parent, args, { db }}): Promise<Owner[]> {
+      const owners = await db.query(
+        `SELECT id, name FROM owners WHERE animal_id = $1`,
+        parent["id"]
+      );
+      return owners;
+    },
+  },
+  Human: {
+    async contact({ parent, args, { salesforce }}): Promise<Contact> {
+      const contact = await salesforce.fetchContact(parent["id"]);
+      return contact;
+    }
+  }
+};
+```
+
+---
+
+# Enter data loader
+
+The batch and cache master
+
+Instead of our resolvers directly calling the database, they call a data loader batching function which returns a promise.
+
+Resolvers are typically called in serial, and when a promise is returned the runtime moves onto the next resolver.
+
+This behavior allows the batching function to aggregate calls from each resolver, and submit a single query.
